@@ -4,6 +4,9 @@ import com.example.gpstracker.pojo.*;
 import com.example.gpstracker.repo.GpsRepo;
 import com.example.gpstracker.repo.MapperRepo;
 import com.example.gpstracker.repo.UserRepository;
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,11 +18,13 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 
+@Slf4j
 @RestController
 @RequestMapping("/tracker")
 public class TrackerController {
+
+//    public static final Logger log = LoggerFactory.getLogger(LoggingPlayground.class);
     @Autowired
     UserRepository userRepository;
     @Autowired
@@ -28,17 +33,16 @@ public class TrackerController {
     @Autowired
     MapperRepo mapperRepo;
     @GetMapping("/updatecordinate")
-    public HttpStatus cordupdate(@RequestParam(value = "lat",required = true)String lat,
+    public ResponseEntity<?> cordupdate(@RequestParam(value = "lat",required = true)String lat,
                                         @RequestParam(value = "long",required = true)String lang,
                                         @RequestParam(value = "deviceid",required = true)String deviceid){
-
+        log.info(lat+"    "+lang);
         GpsCordinates cord=gpsRepo.fingByDeviceId(deviceid);
         if(cord!=null){
             Date date=new Date();
 
             if(cord.getLatnong()==null)
             {
-                System.out.println("if");
                 GpsLatLong latlong=new GpsLatLong();
                 latlong.update(lat,lang,date);
                 List<GpsLatLong> t=new ArrayList<>();
@@ -48,19 +52,28 @@ public class TrackerController {
                 cord1.setDeviceid(cord.getDeviceid());
                 cord1.setLatnong(t);
                 gpsRepo.save(cord1);
-                return HttpStatus.OK;
+                DeviceMapper dm=mapperRepo.fingByDeviceId(deviceid);
+                    if (dm.isRmchange()) {
+                        return new ResponseEntity<>(HttpStatus.OK);
+                    }else{
+                        return new ResponseEntity<>(HttpStatus.ACCEPTED);
+                    }
             }
             else
             {
-                System.out.println("else");
                 GpsLatLong latlong=new GpsLatLong();
                 latlong.update(lat,lang,date);
                 cord.getLatnong().add(latlong);
                 gpsRepo.save(cord);
-                return HttpStatus.OK;
+                DeviceMapper dm=mapperRepo.fingByDeviceId(deviceid);
+                if (dm.isRmchange()) {
+                    return new ResponseEntity<>(HttpStatus.OK);
+                }else{
+                    return new ResponseEntity<>(HttpStatus.ACCEPTED);
+                }
             }
         }else {
-            return HttpStatus.FORBIDDEN;
+            return new ResponseEntity<>(HttpStatus.FORBIDDEN);
         }
     }
 
@@ -156,7 +169,5 @@ public class TrackerController {
         }else {
             return new ResponseEntity<>(HttpStatus.FORBIDDEN);
         }
-
     }
-
 }
